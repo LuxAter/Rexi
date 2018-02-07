@@ -5,6 +5,7 @@
 #include <array>
 #include <iostream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -38,17 +39,32 @@ std::vector<std::string> split(std::string str, char ch) {
   std::string current_str;
   for (std::size_t i = 0; i < str.size(); i++) {
     if (str[i] == ch) {
-      strs.push_back(current_str);
+      if (current_str.empty() == false) {
+        strs.push_back(current_str);
+      }
       current_str = std::string();
     } else {
       current_str += str[i];
     }
   }
-  strs.push_back(current_str);
+  if (current_str.empty() == false) {
+    strs.push_back(current_str);
+  }
   return strs;
 }
 
-ArgumentParser::ArgumentParser(std::string help, std::string epilog) {}
+bool comp_trim(const std::string& lhs, const std::string& rhs) {
+  std::string lh = trim_left(lhs, " -");
+  std::string rh = trim_left(rhs, " -");
+  return lh < rh;
+}
+
+ArgumentParser::ArgumentParser(std::string pr, std::string ep) {
+  prolog_ = pr;
+  epilog_ = ep;
+}
+
+void ArgumentParser::SetVersion(std::string version) { version_ = version; }
 
 void ArgumentParser::AddArgument(
     std::variant<std::string, std::set<std::string>> name, std::any a,
@@ -149,7 +165,7 @@ void ArgumentParser::AddAnyArg(
       new_arg.SetHelp(std::any_cast<std::string>(*it));
     } else if ((*it).type() == typeid(const char*)) {
       checks = true;
-      new_arg.SetHelp(std::string(std::any_cast<std::string>(*it)));
+      new_arg.SetHelp(std::string(std::any_cast<const char*>(*it)));
     } else if ((*it).type() ==
                typeid(std::set<std::variant<std::string, int, bool>>)) {
       new_arg.SetChoices(
@@ -178,7 +194,19 @@ void ArgumentParser::AddAnyArg(
 std::map<std::string, std::variant<std::string, int, bool>>
 ArgumentParser::ParseArgs(int argc, const char* argv[]) {
   std::map<std::string, std::variant<std::string, int, bool>> data;
+  prog_ = argv[0];
+  prog_ = trim_left(prog_, "./");
   std::vector<std::string> args(argv + 1, argv + argc);
+  for (std::vector<std::string>::iterator it = args.begin(); it != args.end();
+       ++it) {
+    if (*it == "-h" || *it == "--help") {
+      std::cout << GetHelp();
+      return data;
+    } else if (*it == "--version") {
+      std::cout << GetVersion();
+      return data;
+    }
+  }
   while (args.size() != 0) {
     bool matched = false;
     for (std::vector<Argument>::iterator it = arguments_.begin();
@@ -207,6 +235,80 @@ ArgumentParser::ParseArgs(int argc, const char* argv[]) {
   }
   return data;
 }
+
+std::string ArgumentParser::GetVersion() {
+  return prog_ + " " + version_ + "\n";
+}
+
+std::string ArgumentParser::GetHelp() {
+  std::stringstream out;
+  out << "Usage: " << prog_ << " " << GetUsage() << "\n";
+  if (prolog_.size() < 80) {
+    out << prolog_;
+  } else {
+    int index = 0;
+    std::vector<std::string> prolog_vec = split(prolog_, ' ');
+    for (std::vector<std::string>::iterator it = prolog_vec.begin();
+         it != prolog_vec.end(); ++it) {
+      if (index + (*it).size() >= 80) {
+        out << "\n";
+        index = 0;
+      }
+      out << *it << ' ';
+      index += (*it).size() + 1;
+    }
+  }
+  out << "\n\n";
+  std::vector<std::string> opt, pos;
+  for (std::vector<Argument>::iterator it = arguments_.begin();
+       it != arguments_.end(); ++it) {
+    if ((*it).IsPositional() == true) {
+      pos.push_back((*it).GetHelp());
+    } else {
+      opt.push_back((*it).GetHelp());
+    }
+  }
+  opt.push_back(
+      "  -h, --help                  show this help message and exit");
+  opt.push_back(
+      "  --version                   show program's version number and exit");
+  std::sort(opt.begin(), opt.end(), comp_trim);
+  std::sort(pos.begin(), pos.end(), comp_trim);
+  if (pos.size() != 0) {
+    out << "Positional Arguments:\n";
+    for (std::vector<std::string>::iterator it = pos.begin(); it != pos.end();
+         ++it) {
+      out << *it << "\n";
+    }
+  }
+  out << "Optional Arguments:\n";
+  for (std::vector<std::string>::iterator it = opt.begin(); it != opt.end();
+       ++it) {
+    out << *it << "\n";
+  }
+  if (epilog_.size() != 0) {
+    out << "\n";
+  }
+  if (epilog_.size() < 80) {
+    out << epilog_;
+  } else {
+    int index = 0;
+    std::vector<std::string> epilog_vec = split(epilog_, ' ');
+    for (std::vector<std::string>::iterator it = epilog_vec.begin();
+         it != epilog_vec.end(); ++it) {
+      if (index + (*it).size() >= 80) {
+        out << "\n";
+        index = 0;
+      }
+      out << *it << ' ';
+      index += (*it).size() + 1;
+    }
+  }
+  out << "\n";
+  return out.str();
+}
+
+std::string ArgumentParser::GetUsage() { return "[OPTIONS]... [FILE]..."; }
 
 bool ArgumentParser::Argument::ParseArg(std::vector<std::string>& args) {
   if (args.size() == 0) {
@@ -367,6 +469,45 @@ std::string ArgumentParser::Argument::GetDest() {
     return longest;
   }
 }
+
+std::string ArgumentParser::Argument::GetHelp() {
+  std::stringstream out;
+  int index = 2;
+  out << "  ";
+  for (std::set<std::string>::iterator it = names_.begin(); it != names_.end();
+       ++it) {
+    out << *it;
+    index += (*it).size();
+    if (it != --names_.end()) {
+      out << ", ";
+      index += 2;
+    }
+  }
+  if (index < 28) {
+    out << std::string(30 - index, ' ');
+  } else {
+    out << "\n" << std::string(30, ' ');
+  }
+  if (help_.size() < 50) {
+    out << help_;
+  } else if (help_.size() >= 50) {
+    index = 0;
+    std::vector<std::string> help_vec = split(help_, ' ');
+    for (std::vector<std::string>::iterator it = help_vec.begin();
+         it != help_vec.end(); ++it) {
+      if (index + (*it).size() >= 50) {
+        out << "\n" << std::string(32, ' ');
+        index = 0;
+      }
+      out << *it << ' ';
+      index += (*it).size() + 1;
+    }
+  }
+
+  return out.str();
+}
+
+bool ArgumentParser::Argument::IsPositional() { return positional_; }
 
 void ArgumentParser::Argument::SetNames(
     std::variant<std::string, std::set<std::string>> names) {

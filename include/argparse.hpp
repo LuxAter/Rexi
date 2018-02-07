@@ -15,6 +15,8 @@ class ArgumentParser {
   ArgumentParser(std::string help = std::string(),
                  std::string epilog = std::string());
 
+  void SetVersion(std::string version);
+
   void AddArgument(std::variant<std::string, std::set<std::string>> name,
                    std::any a = std::monostate(), std::any b = std::monostate(),
                    std::any c = std::monostate(), std::any d = std::monostate(),
@@ -72,12 +74,18 @@ class ArgumentParser {
   std::map<std::string, std::variant<std::string, int, bool>> ParseArgs(
       int argc, const char* argv[]);
 
+  std::string GetVersion();
+  std::string GetHelp();
+  std::string GetUsage();
+
  private:
   class Argument {
    public:
     bool ParseArg(std::vector<std::string>& args);
     std::variant<std::monostate, std::string, int, bool> GetValue();
     std::string GetDest();
+    std::string GetHelp();
+    bool IsPositional();
 
     void SetNames(std::variant<std::string, std::set<std::string>> names);
     void SetAction(Action action);
@@ -101,6 +109,8 @@ class ArgumentParser {
   };
 
   std::vector<Argument> arguments_;
+  std::string prog_, prolog_, epilog_;
+  std::string version_;
 
   void AddAnyArg(std::variant<std::initializer_list<std::string>,
                               std::variant<std::string, std::set<std::string>>>

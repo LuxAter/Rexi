@@ -36,9 +36,24 @@ std::ostream& operator<<(
 
 int main(int argc, char const* argv[]) {
   std::vector<std::string> arguments(argv + 1, argv + argc);
-  ArgumentParser parser("Hello", "Goodbye");
-  parser.AddArgument("--list", ArgumentParser::INT, {2, 4, 6, 8, 10}, 15);
-  parser.AddArgument({"-a", "--all"}, ArgumentParser::STORE_TRUE);
+  ArgumentParser parser(
+      "Lists information about FILEs (the current directory by default). Sorts "
+      "entries alphabetically if non of -cftuvSUX nor --sort is specified.");
+  parser.SetVersion("v0.1");
+  parser.AddArgument({"-a", "--all"}, ArgumentParser::STORE_TRUE,
+                     "show hidden and \'dot\' files");
+  parser.AddArgument({"-1", "--oneline"}, ArgumentParser::STORE_TRUE,
+                     "display one entry per line");
+  parser.AddArgument({"-l", "--long"}, ArgumentParser::STORE_TRUE,
+                     "display extended file metadata as a table");
+  parser.AddArgument({"-G", "--grid"}, ArgumentParser::STORE_TRUE,
+                     "display entries as a grid (default)");
+  parser.AddArgument({"-x", "--across"}, ArgumentParser::STORE_TRUE,
+                     "sort the grid across, rather than downwards");
+  parser.AddArgument({"-R", "--recures"}, ArgumentParser::STORE_TRUE,
+                     "recurse into directories");
+  parser.AddArgument({"-T", "--tree"}, ArgumentParser::STORE_TRUE,
+                     "recurse into directories as a tree");
   auto args = parser.ParseArgs(argc, argv);
   std::cout << "ARGS: " << args << "\n";
   // std::string path = fs::current_path();
