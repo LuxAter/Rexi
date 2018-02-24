@@ -3,6 +3,7 @@
 #include <string>
 
 #include "argparse.hpp"
+#include "core.hpp"
 
 namespace fs = std::experimental::filesystem;
 
@@ -56,6 +57,7 @@ int main(int argc, char const* argv[]) {
                      "recurse into directories as a tree");
   auto args = parser.ParseArgs(argc, argv);
   std::cout << "ARGS: " << args << "\n";
+  Run(args);
   // std::string path = fs::current_path();
   // for (auto& p : fs::directory_iterator(path)) std::cout << p << std::endl;
   return 0;
